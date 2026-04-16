@@ -117,18 +117,70 @@ export class PhysicsEngine {
     }
 
     addExitFunnel() {
-        const wallOptions = { isStatic: true, restitution: 0.9, render: { fillStyle: '#111', strokeStyle: '#00f2ff', lineWidth: 2 } };
-        const funnelY = this.height - 700;
-        const gap = 110;
-        World.add(this.world, [
-            Bodies.rectangle(this.width / 2 - 250, funnelY, 450, 40, { ...wallOptions, angle: 0.7, chamfer: { radius: 20 } }),
-            Bodies.rectangle(this.width / 2 + 250, funnelY, 450, 40, { ...wallOptions, angle: -0.7, chamfer: { radius: 20 } }),
-            Bodies.rectangle(this.width / 2 - gap / 2 - 20, funnelY + 350, 40, 600, { ...wallOptions, chamfer: { radius: 20 } }),
-            Bodies.rectangle(this.width / 2 + gap / 2 + 20, funnelY + 350, 40, 600, { ...wallOptions, chamfer: { radius: 20 } }),
-            Bodies.circle(this.width / 2 - 120, funnelY + 100, 40, wallOptions),
-            Bodies.circle(this.width / 2 + 120, funnelY + 100, 40, wallOptions)
-        ]);
-        this.createRotatingCross(this.width / 2, funnelY - 200, 0.012, 300, 24);
+        const wallOptions = { isStatic: true, restitution: 0.5, render: { fillStyle: '#050510', strokeStyle: '#00f2ff', lineWidth: 3 } };
+        const gap = 130;
+        const tubeWidth = (this.width / 2) - (gap / 2) + 60;
+        const topH = 450;
+        const straightH = 400; // 직선 하강 구간 
+        const flareH = 200;    // 넓어지는 구간
+        const botH = straightH + flareH;
+
+        // 골인지점으로 갈수록 양옆으로 여유공간이 열리게 만든 좌측 벽 폴리곤
+        const leftCurve = [
+            { x: 0, y: 0 },
+            { x: 0, y: topH + botH },
+            { x: tubeWidth - 120, y: topH + botH }, // 밖으로 120만큼 열림
+            { x: tubeWidth, y: topH + straightH },  // 여기서부터 열리기 시작
+            { x: tubeWidth, y: topH }
+        ];
+
+        // 골인지점으로 갈수록 양옆으로 여유공간이 열리게 만든 우측 벽 폴리곤
+        const rightCurve = [
+            { x: 0, y: topH },
+            { x: 0, y: topH + straightH }, // 여기서부터 열리기 시작
+            { x: 120, y: topH + botH },    // 밖으로 120만큼 열림
+            { x: tubeWidth, y: topH + botH },
+            { x: tubeWidth, y: 0 }
+        ];
+
+        const leftBody = Bodies.fromVertices(0, 0, [leftCurve], {
+            ...wallOptions,
+            chamfer: { radius: 60 }
+        });
+
+        const rightBody = Bodies.fromVertices(0, 0, [rightCurve], {
+            ...wallOptions,
+            chamfer: { radius: 60 }
+        });
+
+        const targetLeftRightEdge = this.width / 2 - gap / 2;
+        const targetRightLeftEdge = this.width / 2 + gap / 2;
+        // 바닥 충돌 전선 위에 여유있게 위치시킴
+        const targetBottomEdge = this.height - 20; 
+        const funnelCornerY = targetBottomEdge - botH;
+
+        Matter.Body.setPosition(leftBody, {
+            x: leftBody.position.x + (targetLeftRightEdge - leftBody.bounds.max.x),
+            y: leftBody.position.y + (targetBottomEdge - leftBody.bounds.max.y)
+        });
+
+        Matter.Body.setPosition(rightBody, {
+            x: rightBody.position.x + (targetRightLeftEdge - rightBody.bounds.min.x),
+            y: rightBody.position.y + (targetBottomEdge - rightBody.bounds.max.y)
+        });
+
+        World.add(this.world, [leftBody, rightBody]);
+
+        // 긴 일자 형태로 퍼올리는 기둥 (십자가 대신)
+        this.createRotatingBar(this.width / 2, funnelCornerY + 15, 0.04, 200, 26);
+    }
+
+    createRotatingBar(x, y, speed, length = 160, thickness = 26) {
+        const wallOptions = { isStatic: true, restitution: 0.8, render: { fillStyle: '#1a1a2e', strokeStyle: '#ff0055', lineWidth: 3 } };
+        const bar = Bodies.rectangle(x, y, length, thickness, { ...wallOptions, chamfer: { radius: 10 }, label: 'obstacle' });
+        World.add(this.world, bar);
+        this.rotatingBodies.push({ body: bar, speed });
+        return bar;
     }
 
     createRotatingCross(x, y, speed, size = 150, thickness = 18) {
