@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marble Roulette - 프리미엄 추첨 게임</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbit&family=Pretendard:wght@400;700&display=swap"
+        rel="stylesheet">
+  <script type="module" crossorigin src="./assets/index-t1f1oyiM.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CIrB29rE.css">
+</head>
+
+<body>
+    <div id="app">
+        <aside class="sidebar glass">
+            <header>
+                <h1>MARBLE ROULETTE</h1>
+            </header>
+
+            <section class="settings">
+                <div class="input-group">
+                    <div class="flex-row">
+                        <label for="names">참가자 명단</label>
+                        <button id="shuffle-btn" class="mini-btn">셔플</button>
+                    </div>
+                    <textarea id="names" placeholder="이름1, 이름2, 이름3..."></textarea>
+                </div>
+
+                <div class="controls-row">
+                    <div class="input-group">
+                        <label for="map-select">맵 선택</label>
+                        <select id="map-select">
+                            <option value="classic">클래식 핀볼</option>
+                            <option value="zigzag">지그재그 슬롯</option>
+                            <option value="chaos">혼돈의 소용돌이</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="winner-count">당첨자 수</label>
+                        <input type="number" id="winner-count" min="1" max="20" value="1">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="winner-type">승리 조건</label>
+                    <select id="winner-type">
+                        <option value="first">1등부터 순서대로</option>
+                        <option value="last">꼴찌부터 순서대로</option>
+                    </select>
+                </div>
+
+                <button id="start-btn" class="primary-btn">경기 시작!</button>
+                <button id="reset-btn" class="secondary-btn">초기화</button>
+            </section>
+
+            <section class="leaderboard-section">
+                <h3>실시간 순위</h3>
+                <ul id="leaderboard" class="leaderboard">
+                    <!-- Dynamic updates -->
+                </ul>
+            </section>
+        </aside>
+
+        <main class="game-container">
+            <div id="canvas-wrapper">
+                <!-- Matter.js Canvas will be inserted here -->
+            </div>
+            <div id="winner-overlay" class="hidden">
+                <div class="winner-card glass">
+                    <h2 id="winner-title">축하합니다!</h2>
+                    <div class="winner-list" id="winnerList"></div>
+                    <div class="overlay-actions">
+                        <button id="saveResultsBtn" class="btn secondary">결과 저장 (.txt)</button>
+                        <button id="closeOverlayBtn" class="btn primary">확인</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+
+</html>
