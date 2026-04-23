@@ -38,11 +38,21 @@ export class PhysicsEngine {
     setupCamera() {
         Events.on(this.render, 'beforeRender', () => {
             if (!this.isRacing || this.marbles.length === 0) return;
-            const topMarble = [...this.marbles].sort((a, b) => b.body.position.y - a.body.position.y)[0];
+            
+            // 너무 멀리 떨어진 공(맵 이탈 버그)은 카메라 추적에서 제외
+            const validMarbles = this.marbles.filter(m => m.body.position.y < this.height + 150);
+            if (validMarbles.length === 0) return;
+
+            const topMarble = [...validMarbles].sort((a, b) => b.body.position.y - a.body.position.y)[0];
             if (topMarble) {
                 const targetY = topMarble.body.position.y - 200;
                 const currentY = this.render.bounds.min.y;
-                const newY = currentY + (targetY - currentY) * 0.1;
+                let newY = currentY + (targetY - currentY) * 0.1;
+
+                // 카메라가 결승점(바닥) 아래로 무한정 내려가는 것 방지
+                const maxY = this.height - 800; // 화면 높이(800) 기준 하단 한계
+                if (newY > maxY) newY = maxY;
+
                 Render.lookAt(this.render, {
                     min: { x: 0, y: Math.max(0, newY) },
                     max: { x: this.width, y: Math.max(800, newY + 800) }
@@ -98,8 +108,14 @@ export class PhysicsEngine {
             });
             if (this.isRacing) {
                 this.marbles.forEach(m => {
-                    if (!m.finished && Math.abs(m.body.velocity.x) < 0.2 && Math.abs(m.body.velocity.y) < 0.5) {
-                        Body.applyForce(m.body, m.body.position, { x: (Math.random() - 0.5) * 0.012, y: -0.002 });
+                    if (!m.finished) {
+                        // 벽을 뚫고 맵 밖으로 끝없이 추락하는 공을 강제 완료 처리 (경기가 안 끝나는 버그 방지)
+                        if (m.body.position.y > this.height + 150) {
+                            m.finished = true;
+                            this.onFinish(m);
+                        } else if (Math.abs(m.body.velocity.x) < 0.2 && Math.abs(m.body.velocity.y) < 0.5) {
+                            Body.applyForce(m.body, m.body.position, { x: (Math.random() - 0.5) * 0.012, y: -0.002 });
+                        }
                     }
                 });
             }
@@ -198,15 +214,15 @@ export class PhysicsEngine {
         this.marbles = []; this.rotatingBodies = [];
         const wallOptions = { isStatic: true, render: { fillStyle: '#0a0a1f', strokeStyle: '#00f2ff', lineWidth: 6 } };
         World.add(this.world, [
-            Bodies.rectangle(this.width / 2, -30, this.width, 60, wallOptions),
-            Bodies.rectangle(-15, this.height / 2, 30, this.height, wallOptions),
-            Bodies.rectangle(this.width + 15, this.height / 2, 30, this.height, wallOptions),
-            Bodies.rectangle(this.width / 2, this.height + 30, this.width, 60, { ...wallOptions, label: 'finish' })
+            Bodies.rectangle(this.width / 2, -30, this.width * 3, 60, wallOptions),
+            Bodies.rectangle(-250, this.height / 2, 500, this.height * 2, wallOptions), // 양옆 벽을 아주 두껍게 하여 뚫고 나가는 버그 방지
+            Bodies.rectangle(this.width + 250, this.height / 2, 500, this.height * 2, wallOptions),
+            Bodies.rectangle(this.width / 2, this.height + 100, this.width * 3, 200, { ...wallOptions, label: 'finish' }) // 바닥을 더 두껍고 넓게
         ]);
         this.addExitFunnel();
         this.generateMegaTrack();
-        World.add(this.world, Bodies.rectangle(this.width / 2, this.height - 100, this.width, 40, {
-            isStatic: true, isSensor: true, label: 'finish',
+        World.add(this.world, Bodies.rectangle(this.width / 2, this.height - 100, this.width * 3, 40, {
+            isStatic: true, isSensor: true, label: 'finish', // 센서도 양옆으로 훨씬 넓게
             render: { fillStyle: 'rgba(204, 255, 0, 0.1)', strokeStyle: '#ccff00', lineWidth: 4 }
         }));
     }
