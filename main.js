@@ -55,6 +55,13 @@ ui.startBtn.addEventListener('click', () => {
     physics.reset();
     physics.generateTrack(settings.mapType);
     physics.startRace(names);
+
+    // Scroll to canvas on mobile devices
+    if (window.innerWidth <= 768) {
+        setTimeout(() => {
+            document.querySelector('.game-container').scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+    }
 });
 
 ui.resetBtn.addEventListener('click', () => {
