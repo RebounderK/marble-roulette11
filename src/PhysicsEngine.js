@@ -29,6 +29,8 @@ export class PhysicsEngine {
         this.runner = Runner.create();
         this.marbles = [];
         this.rotatingBodies = [];
+        this.swingingBats = [];
+        this.fireBlowers = [];
         this.isRacing = false;
 
         this.setupCamera();
@@ -103,9 +105,36 @@ export class PhysicsEngine {
         });
 
         Events.on(this.engine, 'beforeUpdate', () => {
+            const time = this.engine.timing.timestamp;
+            
             this.rotatingBodies.forEach(entry => {
                 Body.setAngle(entry.body, entry.body.angle + entry.speed);
             });
+            
+            if (this.swingingBats) {
+                this.swingingBats.forEach(bat => {
+                    const angle = Math.sin(time * bat.speed) * bat.range + bat.baseAngle;
+                    const angularVelocity = (angle - bat.body.angle);
+                    Body.setAngle(bat.body, angle);
+                    Body.setAngularVelocity(bat.body, angularVelocity);
+                    
+                    const offsetX = Math.cos(angle) * (bat.length / 2);
+                    const offsetY = Math.sin(angle) * (bat.length / 2);
+                    Body.setPosition(bat.body, { x: bat.pivotX + offsetX, y: bat.pivotY + offsetY });
+                });
+            }
+
+            if (this.fireBlowers && this.isRacing) {
+                this.fireBlowers.forEach(blower => {
+                    this.marbles.forEach(m => {
+                        if (!m.finished && Matter.Bounds.overlaps(blower.bounds, m.body.bounds)) {
+                            if (Matter.Vertices.contains(blower.vertices, m.body.position)) {
+                                Body.applyForce(m.body, m.body.position, blower.forceFn());
+                            }
+                        }
+                    });
+                });
+            }
             if (this.isRacing) {
                 this.marbles.forEach(m => {
                     if (!m.finished) {
@@ -212,6 +241,7 @@ export class PhysicsEngine {
     generateTrack(mapType) {
         World.clear(this.world, false);
         this.marbles = []; this.rotatingBodies = [];
+        this.swingingBats = []; this.fireBlowers = [];
         const wallOptions = { isStatic: true, render: { fillStyle: '#0a0a1f', strokeStyle: '#00f2ff', lineWidth: 6 } };
         World.add(this.world, [
             Bodies.rectangle(this.width / 2, -30, this.width * 3, 60, wallOptions),
@@ -220,7 +250,13 @@ export class PhysicsEngine {
             Bodies.rectangle(this.width / 2, this.height + 100, this.width * 3, 200, { ...wallOptions, label: 'finish' }) // 바닥을 더 두껍고 넓게
         ]);
         this.addExitFunnel();
-        this.generateMegaTrack();
+        
+        if (mapType === 'hell') {
+            this.generateHellTrack();
+        } else {
+            this.generateMegaTrack();
+        }
+
         World.add(this.world, Bodies.rectangle(this.width / 2, this.height - 100, this.width * 3, 40, {
             isStatic: true, isSensor: true, label: 'finish', // 센서도 양옆으로 훨씬 넓게
             render: { fillStyle: 'rgba(204, 255, 0, 0.1)', strokeStyle: '#ccff00', lineWidth: 4 }
@@ -307,6 +343,91 @@ export class PhysicsEngine {
         }
     }
 
+    createSwingingBat(x, y, options = {}) {
+        const speed = options.speed || 0.005;
+        const range = options.range || Math.PI / 1.5;
+        const length = options.length || 200;
+        const width = options.width || 24;
+        const baseAngle = options.baseAngle || 0;
+        
+        const wallOptions = { isStatic: true, restitution: 0.9, friction: 0, render: { fillStyle: '#2a1a1e', strokeStyle: '#ff003c', lineWidth: 3 } };
+        const bat = Bodies.rectangle(x, y, length, width, { ...wallOptions, label: 'obstacle' });
+        
+        World.add(this.world, bat);
+        this.swingingBats.push({ body: bat, speed, range, baseAngle, pivotX: x, pivotY: y, length });
+        return bat;
+    }
+
+    createFireBlower(x, y, width, height, forceFn) {
+        const fireOptions = { 
+            isStatic: true, 
+            isSensor: true, 
+            render: { fillStyle: 'rgba(255, 69, 0, 0.4)', strokeStyle: '#ff4500', lineWidth: 2 } 
+        };
+        const blower = Bodies.rectangle(x, y, width, height, fireOptions);
+        World.add(this.world, blower);
+        this.fireBlowers.push({
+            bounds: blower.bounds,
+            vertices: blower.vertices,
+            forceFn: forceFn
+        });
+        return blower;
+    }
+
+    generateHellTrack() {
+        const zoneHeight = 900;
+        const totalZones = Math.floor((this.height - 1400) / zoneHeight);
+        
+        for (let zone = 0; zone < totalZones; zone++) {
+            const startY = 400 + zone * zoneHeight;
+            const endY = startY + zoneHeight;
+            const style = zone % 4;
+            
+            if (style === 0) {
+                // Zone 0: 촘촘하고 서로 다른 속도의 어지러운 십자 기둥들
+                for (let i = 0; i < 15; i++) {
+                    const x = Math.random() * (this.width - 100) + 50;
+                    const y = startY + (i * (endY - startY) / 15);
+                    const speed = (0.05 + Math.random() * 0.08) * (Math.random() > 0.5 ? 1 : -1);
+                    this.createRotatingCross(x, y, speed, 120 + Math.random() * 80, 20);
+                }
+            } else if (style === 1) {
+                // Zone 1: 야구 배트처럼 거세게 휘두르는 구역
+                for (let i = 0; i < 6; i++) {
+                    const isLeft = i % 2 === 0;
+                    const x = isLeft ? 50 : this.width - 50;
+                    const y = startY + i * 150 + 50;
+                    this.createSwingingBat(x, y, {
+                        speed: 0.003 + Math.random() * 0.004,
+                        range: Math.PI / 1.2,
+                        length: 300 + Math.random() * 100,
+                        baseAngle: isLeft ? 0 : Math.PI
+                    });
+                }
+            } else if (style === 2) {
+                // Zone 2: 공을 위로 펑펑 튕겨버리는 거대한 불기둥과 가둠막
+                const midY = (startY + endY) / 2;
+                this.createFireBlower(this.width / 2, midY, this.width - 200, 100, () => ({
+                    x: (Math.random() - 0.5) * 0.05,
+                    y: -0.15 - Math.random() * 0.1
+                }));
+                this.createRotatingCross(200, midY - 150, 0.08, 160, 25);
+                this.createRotatingCross(400, midY + 150, -0.08, 160, 25);
+            } else if (style === 3) {
+                // Zone 3: 불기둥 넉백 + 미친듯한 배트 스윙의 혼합
+                for(let i=0; i<3; i++) {
+                    this.createFireBlower(150 + Math.random() * 300, startY + 200 + i * 250, 150, 50, () => ({
+                        x: (Math.random() - 0.5) * 0.08,
+                        y: -0.1
+                    }));
+                    this.createSwingingBat(this.width/2, startY + 100 + i * 250, {
+                        speed: 0.006, range: Math.PI, length: 250, baseAngle: Math.PI/2
+                    });
+                }
+            }
+        }
+    }
+
     startRace(names) {
         this.isRacing = true;
         const colors = ['#00f2ff', '#7000ff', '#ff00c8', '#ffea00', '#00ff73', '#ff6a00', '#ffffff'];
@@ -325,6 +446,7 @@ export class PhysicsEngine {
 
     reset() {
         this.isRacing = false; this.marbles = []; this.rotatingBodies = [];
+        this.swingingBats = []; this.fireBlowers = [];
         Runner.stop(this.runner); Render.stop(this.render); World.clear(this.world, false);
         Render.lookAt(this.render, { min: { x: 0, y: 0 }, max: { x: this.width, y: 800 } });
     }
